@@ -20,9 +20,9 @@ main_cursor = main_db.cursor()
 def main():
     db_statement = "use partners"
     main_cursor.execute(db_statement)
-    sql = 'select joburl, pid from profiles where jobactive=1'    
-    #job_url = "https://boards.greenhouse.io/pendo"
-    #sql = 'select joburl, pid from profiles where joburl="{}"'.format(job_url)
+    #sql = 'select joburl, pid from profiles where jobactive=1'    
+    job_url = "https://allobee-inc.breezy.hr/"
+    sql = 'select joburl, pid from profiles where joburl="{}"'.format(job_url)
     main_cursor.execute(sql)
     data = main_cursor.fetchall()
     print('Data:',data)
@@ -293,9 +293,12 @@ def checkBadLabel(item, label): #returns False if the label has a bad match
 def compileLists(des): #returns a list of regex statements 
     db_statement = "use ximena"
     main_cursor.execute(db_statement)
-    if des == 'class-soup': tid = 1
-    elif des == 'label': tid = 2
-    elif des == 'class-label': tid = 3
+    sql = "select tid from tag_types where des='{}'".format(des)
+    main_cursor.execute(sql)
+    tid = main_cursor.fetchone()[0]
+    #if des == 'class-soup': tid = 1
+    #elif des == 'label': tid = 2
+    #elif des == 'class-label': tid = 3
     sql = 'select tag, diffregex from soup_tags where tid={}'.format(tid)
     main_cursor.execute(sql)
     data = main_cursor.fetchall()

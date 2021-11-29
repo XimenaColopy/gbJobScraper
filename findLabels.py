@@ -7,12 +7,8 @@ from urllib.parse import urljoin
 from findLinks import getLinks, filterLinks
 
 headers = {'User-agent': 'Mozilla/5.0'}
-
-other_db = mysql.connector.connect(host="localhost", user="ximena", password="Horse4horse")
-other_cursor = other_db.cursor()
-db_statement = "use Bad_job_info"
-other_cursor.execute(db_statement)
-
+main_db = mysql.connector.connect(host="gb.csle6sy7qkr1.us-east-1.rds.amazonaws.com", user="ximena", password="Horse4horse")
+main_cursor = main_db.cursor()
 
 def main():
     page_url = input('insert page url: ').strip()
@@ -36,35 +32,6 @@ def main():
     for x in labels: print(x)
     print('')
 
-def compileLists(des): #returns a list of regex statements 
-    if des == 'label':
-        tid = 2
-    elif des == 'class-label':
-        tid = 3
-    else:
-        print('entered "des" incorrectly')
-        return
-    sql = 'select tag, diffregex from soup_tags where tid={}'.format(tid)
-    other_cursor.execute(sql)
-    data = other_cursor.fetchall()
-    return [x[0] if x[1]==1 else '(^|^.*\W+){}($|\W+.*$)'.format(x[0]) for x in data]
-
-
-def checkIfBad(item, label):
-    bad_labels = compileLists('label')
-    for bad in bad_labels:
-        if re.match(r''+bad, label):
-            print(label, 'was a bad match')
-            return False
-    if item.has_attr("class"):
-        cls_names = compileLists('class-label')
-        for bad in cls_names:
-            if re.match(r''+bad, label):
-                print(label, 'had a bad class name:', div['class'])
-                return False
-    print(label, 'is all good')
-    return True
-
 
 def findLabels(soup, links):
     #find the names of links
@@ -75,7 +42,7 @@ def findLabels(soup, links):
         tag = item.find(re.compile('h\d'))
         if tag:
             label = tag.string.strip()
-            if checkIfBad(item, label):
+            if checkBadLabel(item, label):
                 return label
         try:
             return hTag_r(item.parent)
@@ -85,29 +52,55 @@ def findLabels(soup, links):
     for link in links:
         labels = []
         divs = soup.find_all('a', {'href' : link})
-        #print('# occurances:', len(divs))
-        if len(divs) != 1: print('# occurances for {}: {}'.format(link, len(divs)))
+        #if len(divs) != 1: print('# occurances for {}: {}'.format(link, len(divs)))
         for div in divs:
             if div.string:
                 label = div.string
-                if checkIfBad(div, label):
+                if checkBadLabel(div, label):
                     labels.append(label)
-        
+
         if not labels:
             for div in divs:
                 label = hTag_r(div)
                 labels.append(label)
-            
+
         labels = [i for i in labels if i]
         labels = list(dict.fromkeys(labels))# remove duplicates
         if len(labels) == 1:
-            all_labels.append(labels[0].strip())
+            all_labels.append(labels[0])
         else:
-            if len(labels) > 1: print("Error multiple labels:", labels)
-            else: print('No label')
+            if len(labels) > 1: print("multiple labels for {}:".format(link), labels)
+            else: print('no label for {}'.format(link))
             all_labels.append('')
 
     return all_labels
+
+
+def checkBadLabel(item, label): #returns False if the label has a bad match
+    bad_labels = compileLists('label')
+    for bad in bad_labels:
+        #print('re.match statement', r''+bad, label)
+        if re.match(r''+bad, label): ##This is throwing a lot of warnings and I don't know why
+            #print(label, 'was a bad match')
+            return False
+    if item.has_attr("class"):
+        cls_names = compileLists('class-label')
+        for bad in cls_names:
+            if re.match(r''+bad, label):
+                print(label, 'had a bad class name:', div['class'])
+                return False
+    return True
+
+def compileLists(des): #returns a list of regex statements
+    db_statement = "use ximena"
+    main_cursor.execute(db_statement)
+    if des == 'class-soup': tid = 1
+    elif des == 'label': tid = 2
+    elif des == 'class-label': tid = 3
+    sql = 'select tag, diffregex from soup_tags where tid={}'.format(tid)
+    main_cursor.execute(sql)
+    data = main_cursor.fetchall()
+    return [x[0] if x[1]==1 else '(?i)(^|^.*\W+){}($|\W+.*$)'.format(x[0]) for x in data]
 
 main()
 
