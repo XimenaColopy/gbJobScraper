@@ -6,9 +6,17 @@ from urllib.parse import urljoin
 
 from findLinks import getLinks, filterLinks
 
+import sys
+sys.path.append('/home/ximena/auth')
+import authJS
+
+mydb = mysql.connector.connect(host=authJS.HOSTNAME, user=authJS.USERNAME, password=authJS.PASSWORD)
+mycursor = mydb.cursor()
+db_statement = "use {}".format(authJS.DATABASE)
+mycursor.execute(db_statement)
+
+
 headers = {'User-agent': 'Mozilla/5.0'}
-main_db = mysql.connector.connect(host="gb.csle6sy7qkr1.us-east-1.rds.amazonaws.com", user="ximena", password="Horse4horse")
-main_cursor = main_db.cursor()
 
 def main():
     page_url = input('insert page url: ').strip()
@@ -92,8 +100,6 @@ def checkBadLabel(item, label): #returns False if the label has a bad match
     return True
 
 def compileLists(des): #returns a list of regex statements
-    db_statement = "use ximena"
-    main_cursor.execute(db_statement)
     if des == 'class-soup': tid = 1
     elif des == 'label': tid = 2
     elif des == 'class-label': tid = 3

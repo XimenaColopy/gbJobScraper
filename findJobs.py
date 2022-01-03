@@ -4,25 +4,21 @@ import re
 import mysql.connector
 from urllib.parse import urljoin
 
+import sys
+sys.path.append('/home/ximena/auth')
+import authJS
+
+mydb = mysql.connector.connect(host=authJS.HOSTNAME, user=authJS.USERNAME, password=authJS.PASSWORD)
+mycursor = mydb.cursor()
+db_statement = "use {}".format(authJS.DATABASE)
+mycursor.execute(db_statement)
+
 
 headers = {'User-agent': 'Mozilla/5.0'}
 
-main_db = mysql.connector.connect(host="gb.csle6sy7qkr1.us-east-1.rds.amazonaws.com", user="ximena", password="Horse4horse")
-main_cursor = main_db.cursor()
-#db_statement = "use partners"
-#main_cursor.execute(db_statement)
-
-#other_db = mysql.connector.connect(host="localhost", user="ximena", password="Horse4horse")
-#other_cursor = other_db.cursor()
-#db_statement = "use Bad_job_info"
-#other_cursor.execute(db_statement)
-
 def main():
-    db_statement = "use partners"
-    main_cursor.execute(db_statement)
-    #sql = 'select joburl, pid from profiles where jobactive=1'    
-    job_url = "https://allobee-inc.breezy.hr/"
-    sql = 'select joburl, pid from profiles where joburl="{}"'.format(job_url)
+    sql = 'select joburl, pid from profiles where jobactive=1'    
+    #sql = 'select joburl, pid from profiles where joburl="{}"'.format(job_url)
     main_cursor.execute(sql)
     data = main_cursor.fetchall()
     print('Data:',data)
@@ -93,8 +89,6 @@ def removeNoLabel(job_info):
     return job_info
 
 def insertInfo(pid, job_info):
-    db_statement = "use partners"
-    main_cursor.execute(db_statement)
     for item in job_info:
         link = str(item[0]).strip()
         label = str(item[1]).strip()
@@ -136,8 +130,6 @@ def insertInfo(pid, job_info):
 ###########----- LINKS-----###############
 
 def getLinks(soup):
-    db_statement = "use ximena"
-    main_cursor.execute(db_statement)
     links = []
     blacklist = [
         'noscript',
@@ -291,8 +283,6 @@ def checkBadLabel(item, label): #returns False if the label has a bad match
     return True
 
 def compileLists(des): #returns a list of regex statements 
-    db_statement = "use ximena"
-    main_cursor.execute(db_statement)
     sql = "select tid from tag_types where des='{}'".format(des)
     main_cursor.execute(sql)
     tid = main_cursor.fetchone()[0]

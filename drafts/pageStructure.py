@@ -94,10 +94,6 @@ def parent2(soup, link):
     #print("{}:{}".format(tree_size, link))
     return tree_size
 
-
-
-
-
 def parent(soup, link):
 #returns a list of dictionaries about elements in the parent structure of a single link
     parent_tree = []

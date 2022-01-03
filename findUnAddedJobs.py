@@ -3,10 +3,15 @@ import requests
 
 headers = {'User-agent': 'Mozilla/5.0'}
 
-main_db = mysql.connector.connect(host="gb.csle6sy7qkr1.us-east-1.rds.amazonaws.com", user="ximena", password="Horse4horse")
-main_cursor = main_db.cursor()
-db_statement = "use partners"
-main_cursor.execute(db_statement)
+import sys
+sys.path.append('/home/ximena/auth')
+import authJS
+
+mydb = mysql.connector.connect(host=authJS.HOSTNAME, user=authJS.USERNAME, password=authJS.PASSWORD)
+mycursor = mydb.cursor()
+db_statement = "use {}".format(authJS.DATABASE)
+mycursor.execute(db_statement)
+
 
 
 sql = "SELECT title, url FROM jobtemp  WHERE DATE(modifydate) != CURDATE()"

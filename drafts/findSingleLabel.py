@@ -11,15 +11,14 @@ link = input('insert link: ').strip()
 #res = requests.get(str(page_url), headers=headers, timeout=5)
 #soup = BeautifulSoup(str(res.text), features="html.parser", multi_valued_attributes=None)
 
-other_db = mysql.connector.connect(host="localhost", user="ximena", password="Horse4horse")
-other_cursor = other_db.cursor()
-db_statement = "use Bad_job_info"
-other_cursor.execute(db_statement)
+import sys
+sys.path.append('/home/ximena/auth')
+import authJS
 
-main_db = mysql.connector.connect(host="gb.csle6sy7qkr1.us-east-1.rds.amazonaws.com", user="ximena", password="Horse4horse")
-main_cursor = main_db.cursor()
-db_statement = "use partners"
-main_cursor.execute(db_statement)
+mydb = mysql.connector.connect(host=authJS.HOSTNAME, user=authJS.USERNAME, password=authJS.PASSWORD)
+mycursor = mydb.cursor()
+db_statement = "use {}".format(authJS.DATABASE)
+mycursor.execute(db_statement)
 
 tag = {}
 
