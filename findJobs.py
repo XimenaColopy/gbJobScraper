@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import re
 import mysql.connector
 from urllib.parse import urljoin
+import traceback ##to see the exceptions for debugging
 
 import sys
 sys.path.append('/home/ximena/auth')
@@ -10,17 +11,17 @@ import authJS
 
 mydb = mysql.connector.connect(host=authJS.HOSTNAME, user=authJS.USERNAME, password=authJS.PASSWORD)
 mycursor = mydb.cursor()
-db_statement = "use {}".format(authJS.DATABASE)
-mycursor.execute(db_statement)
 
 
 headers = {'User-agent': 'Mozilla/5.0'}
 
 def main():
-    sql = 'select joburl, pid from profiles where jobactive=1'    
-    #sql = 'select joburl, pid from profiles where joburl="{}"'.format(job_url)
-    main_cursor.execute(sql)
-    data = main_cursor.fetchall()
+    mycursor.execute("use {}".format(authJS.MAIN_DATABASE))
+    #sql = 'select joburl, pid from profiles where jobactive=1' 
+    job_url = "https://www.processmaker.com/about/careers/"
+    sql = 'select joburl, pid from profiles where joburl="{}"'.format(job_url)
+    mycursor.execute(sql)
+    data = mycursor.fetchall()
     print('Data:',data)
     for partner in data:
         main_loop(partner)
@@ -53,6 +54,7 @@ def main_loop(partner):
         print('\n\nERROR getLinks ISNT WORKING\n\n')
         return
 
+
     try:
         all_links = filterLinks(unfiltered_links, job_url)
         links = all_links[0]
@@ -60,7 +62,8 @@ def main_loop(partner):
         bad_links = all_links[2]
         #print('filterLinks is working')
         if bad_links: print('Bad links:', bad_links)
-    except:
+    except Exception:
+        traceback.print_exc()
         print('\n\nERROR filterLinks ISNT WORKING\n\n')
         return
 
@@ -92,11 +95,11 @@ def insertInfo(pid, job_info):
     for item in job_info:
         link = str(item[0]).strip()
         label = str(item[1]).strip()
-
+        mycursor.execute("use {}".format(authJS.MAIN_DATABASE))
         sql = 'SELECT title FROM jobtemp WHERE url=%s'
         args = (link,)
-        main_cursor.execute(sql, args)
-        data = main_cursor.fetchone()
+        mycursor.execute(sql, args)
+        data = mycursor.fetchone()
 
         if data: #update info
             current_label = data[0]
@@ -106,25 +109,25 @@ def insertInfo(pid, job_info):
                 #print('incorrect label:', current_label, link)
                 sql = 'UPDATE jobtemp SET title=%s WHERE url=%s'
                 args = (label, link)
-                main_cursor.execute(sql, args)
-                main_db.commit()
+                mycursor.execute(sql, args)
+                mydb.commit()
                 #sql = 'SELECT title FROM jobtemp WHERE url=%s'
                 #args = (link,)
-                #main_cursor.execute(sql, args)
-                #data = main_cursor.fetchone()
+                #mycursor.execute(sql, args)
+                #data = mycursor.fetchone()
                 print('updated label {} was previously {}'.format(label, current_label))
             #update timestamp
             sql = 'UPDATE jobtemp SET modifydate=NOW() WHERE title=%s AND url=%s'
             args = (label, link)
-            main_cursor.execute(sql, args)
-            main_db.commit()
+            mycursor.execute(sql, args)
+            mydb.commit()
             print(label, link)
         
         else: #insert information
             sql = "insert into jobtemp(pid, title, url) values(%s, %s, %s)"
             args = (pid, label, link)
-            main_cursor.execute(sql, args)
-            main_db.commit()
+            mycursor.execute(sql, args)
+            mydb.commit()
             print('add new job:', label, link)
 
 ###########----- LINKS-----###############
@@ -182,15 +185,15 @@ def filterLinks(links, target_url):
             links.remove(link)
 
     #make sure the links are wanted 
-    db_statement = "use ximena"
-    main_cursor.execute(db_statement)
+    mycursor.execute("use {}".format(authJS.OTHER_DATABASE))
     for link in links[:]:
         sql = "SELECT keyword FROM urls WHERE %s LIKE CONCAT('%',keyword,'%')"
         args = (link, )
-        main_cursor.execute(sql, args)
-        if main_cursor.fetchone() != None:
+        mycursor.execute(sql, args)
+        if mycursor.fetchone() != None:
             links.remove(link)
             bad_links.append(link)
+
 
     completed_links = []
     #make sure links are valid
@@ -209,6 +212,9 @@ def filterLinks(links, target_url):
         #make sure links are valid
         r = requests.get(full_link, headers=headers, timeout=5)
         if not r: links.remove(link)
+        elif any(x in full_link for x in [".jpg", ".gif", ".png", ".jpeg", ".pdf"]):
+            print("{} is an image".format(full_link))
+            completed_links.append(full_link)
         else:
             completed_links.append(full_link)
             link_soup = BeautifulSoup(str(r.text), features="html.parser")
@@ -218,7 +224,6 @@ def filterLinks(links, target_url):
                     links.remove(link)
                     completed_links.remove(full_link)
                     bad_links.append(link)
-
     if len(completed_links) != len(links):
         print('\nFunction "filterLinks" is not working\n') #This will cause adn error later with len(labels) != len(links)
     return links, completed_links, bad_links
@@ -283,15 +288,16 @@ def checkBadLabel(item, label): #returns False if the label has a bad match
     return True
 
 def compileLists(des): #returns a list of regex statements 
+    mycursor.execute("use {}".format(authJS.OTHER_DATABASE))
     sql = "select tid from tag_types where des='{}'".format(des)
-    main_cursor.execute(sql)
-    tid = main_cursor.fetchone()[0]
+    mycursor.execute(sql)
+    tid = mycursor.fetchone()[0]
     #if des == 'class-soup': tid = 1
     #elif des == 'label': tid = 2
     #elif des == 'class-label': tid = 3
     sql = 'select tag, diffregex from soup_tags where tid={}'.format(tid)
-    main_cursor.execute(sql)
-    data = main_cursor.fetchall()
+    mycursor.execute(sql)
+    data = mycursor.fetchall()
     return [x[0] if x[1]==1 else '(?i)(^|^.*\W+){}($|\W+.*$)'.format(x[0]) for x in data]
 
 

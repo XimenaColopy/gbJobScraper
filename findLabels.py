@@ -12,7 +12,7 @@ import authJS
 
 mydb = mysql.connector.connect(host=authJS.HOSTNAME, user=authJS.USERNAME, password=authJS.PASSWORD)
 mycursor = mydb.cursor()
-db_statement = "use {}".format(authJS.DATABASE)
+db_statement = "use {}".format(authJS.OTHER_DATABASE)
 mycursor.execute(db_statement)
 
 
@@ -99,13 +99,16 @@ def checkBadLabel(item, label): #returns False if the label has a bad match
                 return False
     return True
 
-def compileLists(des): #returns a list of regex statements
-    if des == 'class-soup': tid = 1
-    elif des == 'label': tid = 2
-    elif des == 'class-label': tid = 3
+def compileLists(des): #returns a list of regex statements 
+    sql = "select tid from tag_types where des='{}'".format(des)
+    mycursor.execute(sql)
+    tid = mycursor.fetchone()[0]
+    #if des == 'class-soup': tid = 1
+    #elif des == 'label': tid = 2
+    #elif des == 'class-label': tid = 3
     sql = 'select tag, diffregex from soup_tags where tid={}'.format(tid)
-    main_cursor.execute(sql)
-    data = main_cursor.fetchall()
+    mycursor.execute(sql)
+    data = mycursor.fetchall()
     return [x[0] if x[1]==1 else '(?i)(^|^.*\W+){}($|\W+.*$)'.format(x[0]) for x in data]
 
 main()
