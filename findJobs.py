@@ -9,27 +9,33 @@ import sys
 sys.path.append('/home/ximena/auth')
 import authJS
 
-mydb = mysql.connector.connect(host=authJS.HOSTNAME, user=authJS.USERNAME, password=authJS.PASSWORD)
-mycursor = mydb.cursor()
+#mydb = mysql.connector.connect(host=authJS.HOSTNAME, user=authJS.USERNAME, password=authJS.PASSWORD)
+#mycursor = mydb.cursor()
 
 
 headers = {'User-agent': 'Mozilla/5.0'}
 
 def main():
+    mydb = mysql.connector.connect(host=authJS.HOSTNAME, user=authJS.USERNAME, password=authJS.PASSWORD)
+    mycursor = mydb.cursor()
     mycursor.execute("use {}".format(authJS.MAIN_DATABASE))
-    #sql = 'select joburl, pid from profiles where jobactive=1' 
-    job_url = "https://www.processmaker.com/about/careers/"
-    sql = 'select joburl, pid from profiles where joburl="{}"'.format(job_url)
+    sql = 'select joburl, pid from profiles where jobactive=1' 
+    #job_url = "https://www.processmaker.com/about/careers/"
+    #sql = 'select joburl, pid from profiles where joburl="{}"'.format(job_url)
     mycursor.execute(sql)
     data = mycursor.fetchall()
     print('Data:',data)
     for partner in data:
-        main_loop(partner)
+        main_loop(partner,  mydb)
 
-def main_loop(partner):
+def main_loop(partner, mydb):
     """Main for each partner"""
     job_url = partner[0]
     pid = partner[1]
+
+    if not mydb.is_connected():
+        mydb = mysql.connector.connect(host=authJS.HOSTNAME, user=authJS.USERNAME, password=authJS.PASSWORD)
+    mycursor = mydb.cursor()
 
     print('\nJob Url:', job_url)
 
@@ -46,17 +52,18 @@ def main_loop(partner):
     if soup.body: soup = soup.body
 
     try:
-        __x__ = getLinks(soup)
+        __x__ = getLinks(soup, mycursor)
         soup = __x__[0]
         unfiltered_links = __x__[1]
         #print("getLinks is working")
-    except:
+    except Exception:
+        traceback.print_exc()
         print('\n\nERROR getLinks ISNT WORKING\n\n')
         return
 
 
     try:
-        all_links = filterLinks(unfiltered_links, job_url)
+        all_links = filterLinks(unfiltered_links, job_url, mycursor)
         links = all_links[0]
         completed_links = all_links[1]
         bad_links = all_links[2]
@@ -68,9 +75,10 @@ def main_loop(partner):
         return
 
     try:
-        labels = findLabels(soup, links)
+        labels = findLabels(soup, links, mycursor)
     #print('findLabels is working')
-    except:
+    except Exception:
+        traceback.print_exc()
         print('\n\nERROR findLabels ISNT WORKING\n\n')
         return
 
@@ -82,7 +90,13 @@ def main_loop(partner):
     job_info = [(completed_links[i], labels[i]) for i in range(0, len(completed_links))]
     job_info = removeNoLabel(job_info)
 
-    insertInfo(pid, job_info)
+    try:
+        insertInfo(pid, job_info, mycursor, mydb)
+    except Exception:
+        traceback.print_exc()
+        print('ERROR insertInfo ISNT WORKING\n\n')
+        return 
+
 
 def removeNoLabel(job_info):
     for job in job_info[:]:
@@ -91,7 +105,7 @@ def removeNoLabel(job_info):
             job_info.remove(job)
     return job_info
 
-def insertInfo(pid, job_info):
+def insertInfo(pid, job_info, mycursor, mydb):
     for item in job_info:
         link = str(item[0]).strip()
         label = str(item[1]).strip()
@@ -132,7 +146,7 @@ def insertInfo(pid, job_info):
 
 ###########----- LINKS-----###############
 
-def getLinks(soup):
+def getLinks(soup, mycursor):
     links = []
     blacklist = [
         'noscript',
@@ -153,7 +167,7 @@ def getLinks(soup):
     #    re.compile('(^|^.*\W+)header(s?)($|\W+.*$)'),
     #    re.compile('(^|^.*\W+)cookies($|\W+.*$)')
     #]
-    cls_name = compileLists('class-soup')
+    cls_name = compileLists('class-soup', mycursor)
     cls_name = [re.compile(x) for x in cls_name]
     #for s in cls_name: s = re.compile
 
@@ -173,7 +187,7 @@ def getLinks(soup):
 
     return soup, links
 
-def filterLinks(links, target_url):
+def filterLinks(links, target_url, mycursor):
     #make sure the links actually go to another page.
     bad_links = []
     for link in links[:]:
@@ -230,7 +244,7 @@ def filterLinks(links, target_url):
 
 ###########----- LABELS -----###############
 
-def findLabels(soup, links):
+def findLabels(soup, links, mycursor):
     #find the names of links
     all_labels = []
 
@@ -239,7 +253,7 @@ def findLabels(soup, links):
         tag = item.find(re.compile('h\d'))
         if tag:
             label = tag.string.strip()
-            if checkBadLabel(item, label):
+            if checkBadLabel(item, label, mycursor):
                 return label
         try:
             return hTag_r(item.parent)
@@ -253,7 +267,7 @@ def findLabels(soup, links):
         for div in divs:
             if div.string:
                 label = div.string
-                if checkBadLabel(div, label):
+                if checkBadLabel(div, label, mycursor):
                     labels.append(label)
 
         if not labels:
@@ -272,22 +286,22 @@ def findLabels(soup, links):
 
     return all_labels
 
-def checkBadLabel(item, label): #returns False if the label has a bad match
-    bad_labels = compileLists('label')
+def checkBadLabel(item, label, mycursor): #returns False if the label has a bad match
+    bad_labels = compileLists('label', mycursor)
     for bad in bad_labels:
         #print('re.match statement', r''+bad, label)
         if re.match(r''+bad, label): ##This is throwing a lot of warnings and I don't know why
             #print(label, 'was a bad match')
             return False
     if item.has_attr("class"):
-        cls_names = compileLists('class-label')
+        cls_names = compileLists('class-label', mycursor)
         for bad in cls_names:
             if re.match(r''+bad, label):
                 print(label, 'had a bad class name:', div['class'])
                 return False
     return True
 
-def compileLists(des): #returns a list of regex statements 
+def compileLists(des, mycursor): #returns a list of regex statements 
     mycursor.execute("use {}".format(authJS.OTHER_DATABASE))
     sql = "select tid from tag_types where des='{}'".format(des)
     mycursor.execute(sql)
